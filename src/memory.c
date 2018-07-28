@@ -31,7 +31,10 @@ void writeMem(int adr, int val) // Write (should handle hooks/alias)
 		val = val & 0xFF;
 	}
 
-	Memory[adr & 0xFFFF] = val;
+	if(adr<0x18 || adr>(0x18+7)) // don't clear collision registers (Hack - see stick.c)
+	{
+		Memory[adr & 0xFFFF] = val;
+	}
 
 	//STIC Alias
 	if((adr>=0x4000 && adr<=0x403F) || (adr>=0x8000 && adr<=0x803F) || (adr>=0xC000 && adr<=0xC03F))

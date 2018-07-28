@@ -180,6 +180,8 @@ void drawSprites() // MOBs
 
 	for(i=7; i>=0; i--)
 	{
+		Memory[0x18+i] = 0; // clear collisions (Hack - see memory.c)
+
 		cbit = 1<<i; // set collision bit
 
 		Rx = Memory[0x00+i];
