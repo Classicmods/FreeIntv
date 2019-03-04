@@ -35,6 +35,9 @@ unsigned int cbuff[352*224]; // collision buffer
 unsigned int delayH = 16; // Horizontal Delay
 unsigned int delayV = 16; // Vertical Delay
 
+int extendTop = 0;
+int extendLeft = 0;
+
 unsigned int colors[16] =
 {
 	0x0C0005, /* 0x000000; */ // Black
@@ -63,6 +66,7 @@ void STICReset()
 	SR1 = 0;
 	Cycles = 0;
 	DisplayEnabled = 0;
+	VerticalDelay = 0;
 }
 
 void STICDrawFrame()
@@ -74,9 +78,15 @@ void STICDrawFrame()
 		cbuff[i]=0;
 	}
 
-	delayH = 16+(Memory[0x30]<<1); //16-Memory[0x30];
+	VerticalDelay = Memory[0x31];
 
-	delayV = 16+(Memory[0x31]<<1); //16-Memory[0x31];
+	extendTop = 16*((Memory[0x32]>>1)&0x01);
+	
+	extendLeft = 16*(Memory[0x32]&0x01);
+
+	delayH = 16+((Memory[0x30]<<1)&0xF);
+
+	delayV = 16+((Memory[0x31]<<1)&0xF);
 
 	// draw displayed area
 	drawBackground();
@@ -95,21 +105,27 @@ void STICDrawFrame()
 	for(i=0; i<8; i++)
 	{
 		// clear self-interactions 
-		if(((Memory[0x18+i]>>i)&0x01)==1)
-		{
-			Memory[0x18+i] = Memory[0x18+i] ^ (1<<i);
-		}
-		// skip non-interacting sprites
-		if(((Memory[0x00+i]>>8)&0x01)==0) { continue; }
+		Memory[0x18+i] &= (1<<i)^0x3FFF;
 
 		// copy collisions to colliding sprites
 		for(j=0; j<8; j++)
 		{
 			if(j==i) { continue; }
-			if(((Memory[0x00+j]>>8)&0x01)==0) { continue; } // skip non-interacting sprites
 			if(((Memory[0x18+j]>>i) & 1) == 1)
 			{
 				Memory[0x18+i] |= (1<<j);
+			}
+		}
+	}
+	// clear any non-interacting sprite interactions //
+	for(i=0; i<8; i++)
+	{
+		if(((Memory[0x00+i]>>8)&0x01)==0)
+		{
+			Memory[0x18+i] &= 0x3C00;
+			for(j=0; j<8; j++)
+			{
+				Memory[0x18+j] &= (1<<i)^0x3FFF;
 			}
 		}
 	}
@@ -121,8 +137,7 @@ void drawBorder()
 	int j;
 	int cbit = 1<<9; // bit 9 - border collision 
 	int color = colors[Memory[0x2C]]; // border color
-	int extendTop = 16*((Memory[0x32]>>1)&0x01);
-	int extendLeft = 16*(Memory[0x32]&0x01);
+	
 	for(i=0; i<16+extendTop; i++)
 	{
 		for(j=0; j<352; j++)
@@ -246,7 +261,7 @@ void drawSprites() // MOBs
 
 					if(((Rx>>9)&0x01)==1) // visible
 					{
-						showpixel = !((pixel==0) | ((priority==1) & (((cbuff[n]>>8)&0x01)==1)));
+						showpixel = (pixel==1) & ((priority==0) | ((priority==1) & (((cbuff[n]>>8)&0x01)==1)));
 						frame[n] = showpixel ? fgcolor : frame[n];
 						frame[n+1] = showpixel ? fgcolor : frame[n+1];
 						// draw four pixels wide if sizeX==1
@@ -398,7 +413,7 @@ void drawBackground()
 						frame[a+1] = sc;
 						frame[a+352] = sc;
 						frame[a+352+1] = sc;
-						if(((gdata>>k)&1)==1)
+						if(((gdata>>k)&1)==0)
 						{
 							cbuff[a] |= cbit;
 							cbuff[a+1] |= cbit;
